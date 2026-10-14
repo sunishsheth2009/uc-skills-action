@@ -11,7 +11,8 @@ Once your Databricks administrator has connected GitHub to a publishing service
 principal, you only need one workflow file. No mapping file is needed when the
 skill folders all go to the same schema.
 
-1. Copy [examples/quickstart.yml](examples/quickstart.yml) into your repository as
+1. Copy [examples/quickstart.yml](examples/quickstart.yml)
+   ([download](https://raw.githubusercontent.com/sunishsheth2009/uc-skills-action/v0.1.0/examples/quickstart.yml)) into your repository as
    `.github/workflows/publish-skills.yml`.
 2. Change `skills-directory: skills` to your skills folder and
    `target-schema: acme.team_skills` to your UC schema. If you change the folder,
@@ -53,6 +54,12 @@ Skill authors should not have to repeat it.
    **variables** `DATABRICKS_HOST` (workspace URL) and `DATABRICKS_CLIENT_ID`
    (publishing principal's application ID). Neither value is a secret. The SDK
    automatically exchanges GitHub's short-lived OIDC token with Databricks.
+
+If your organization already has a service principal for OAuth CI, reuse that
+setup with [examples/quickstart-oauth.yml](examples/quickstart-oauth.yml). Store
+`DATABRICKS_CLIENT_SECRET` as a GitHub environment **secret** and the workspace URL
+and client ID as environment variables. This avoids needing a new federation
+policy, while requiring secret rotation. The publishing permissions are the same.
 
 An organization can centralize the administrator setup and reusable workflows
 so each skill repository only chooses its folder and destination schema.

@@ -1,0 +1,30 @@
+# Use this variant if your organization already uses OAuth M2M in GitHub CI.
+name: Publish skills to Databricks
+on:
+  push:
+    branches: [main]
+    paths: ['skills/**', '.github/workflows/publish-skills.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: publish-uc-skills
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DATABRICKS_AUTH_TYPE: oauth-m2m
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: sunishsheth2009/uc-skills-action@v0.1.0
+        with:
+          skills-directory: skills
+          target-schema: acme.team_skills
+          prune-files: 'true'
