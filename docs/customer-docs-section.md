@@ -18,7 +18,8 @@ Databricks notebook or job.
 Databricks using [workload identity federation](https://docs.databricks.com/aws/en/dev-tools/auth/provider-github)
 and give the publishing service principal access to your skills schema. Your
 repository's `production` environment must define the `DATABRICKS_HOST` and
-`DATABRICKS_CLIENT_ID` variables.
+`DATABRICKS_CLIENT_ID` variables. If your workspace restricts network access,
+use a self-hosted runner that can reach it.
 
 1. Copy the [publishing workflow](https://github.com/sunishsheth2009/uc-skills-action/blob/v0.1.0/examples/quickstart.yml)
    into your repository as `.github/workflows/publish-skills.yml`.

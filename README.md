@@ -61,6 +61,10 @@ setup with [examples/quickstart-oauth.yml](examples/quickstart-oauth.yml). Store
 and client ID as environment variables. This avoids needing a new federation
 policy, while requiring secret rotation. The publishing permissions are the same.
 
+For a workspace with private networking or IP restrictions, use a self-hosted
+GitHub runner with access to the workspace. GitHub-hosted `ubuntu-latest` runners
+can be used when the workspace is publicly reachable and permits those requests.
+
 An organization can centralize the administrator setup and reusable workflows
 so each skill repository only chooses its folder and destination schema.
 

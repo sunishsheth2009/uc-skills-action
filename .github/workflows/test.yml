@@ -18,3 +18,10 @@ jobs:
         with:
           source-directory: tests/fixture
           dry-run: 'true'
+      - name: Check simple directory inputs without a mapping file
+        uses: ./
+        with:
+          source-directory: tests/fixture
+          skills-directory: skills
+          target-schema: acme.skills
+          dry-run: 'true'
