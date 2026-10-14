@@ -5,25 +5,57 @@ Unity Catalog skills whenever you merge changes. Publishing runs on the GitHub
 runner using the Skills and Files APIs. No Databricks notebook, job, or compute is
 required. This repository is a POC, not an official Databricks supported action.
 
-## Start with your repository
+## Get started: one workflow file
 
-1. Have an administrator enable UC skills in your workspace, create the target
-   catalog/schema, and give a publishing service principal workspace access,
-   `USE CATALOG`, `USE SCHEMA`, and `CREATE VOLUME`. For existing skills, the
-   publisher needs `READ VOLUME` and `WRITE VOLUME`; creating as the same service
-   principal makes it the owner. Share skills separately with `READ VOLUME` grants.
+Once your Databricks administrator has connected GitHub to a publishing service
+principal, you only need one workflow file. No mapping file is needed when the
+skill folders all go to the same schema.
+
+1. Copy [examples/quickstart.yml](examples/quickstart.yml) into your repository as
+   `.github/workflows/publish-skills.yml`.
+2. Change `skills-directory: skills` to your skills folder and
+   `target-schema: acme.team_skills` to your UC schema. If you change the folder,
+   update the workflow's `paths` filter too.
+3. In GitHub, open **Actions > Publish skills to Databricks > Run workflow**, or
+   merge a skill change to `main`.
+
+The action maps `skills/<folder>/SKILL.md` to `acme.team_skills.<folder>` and
+publishes supporting files too. No fork, GitHub App installation, notebook, or
+Databricks job is needed. Customers reference the hosted action:
+
+```yaml
+- uses: sunishsheth2009/uc-skills-action@v0.1.0
+  with:
+    skills-directory: skills
+    target-schema: acme.team_skills
+    prune-files: 'true'
+```
+
+For custom names or several destination schemas, use the mapping example below.
+Pin a reviewed release commit SHA for production. The current personal-account
+release is a POC; official Databricks docs should reference an approved
+Databricks-owned action once it has been reviewed and transferred.
+
+### One-time administrator setup
+
+This setup is required for any automated publisher, including the notebook.
+Skill authors should not have to repeat it.
+
+1. Enable UC skills in the workspace and create the destination catalog/schema.
+   Give the publishing service principal workspace access, `USE CATALOG`,
+   `USE SCHEMA`, and `CREATE VOLUME`. Existing skills also need `READ VOLUME`
+   and `WRITE VOLUME` for that publisher. New skills are owned by the publisher;
+   share them separately with `READ VOLUME` grants.
 2. Configure [GitHub workload identity federation](https://docs.databricks.com/aws/en/dev-tools/auth/provider-github)
-   for that service principal, your repository, and a GitHub environment such as
-   `production`. Set `DATABRICKS_HOST` and `DATABRICKS_CLIENT_ID` as GitHub environment
-   **variables**, not secrets. Match the federation policy to GitHub's exact OIDC
-   subject; newer repos can include immutable numeric IDs. The SDK exchanges the
-   OIDC token automatically. No long-lived token is needed.
-3. Copy [examples/skills.yaml](examples/skills.yaml) to your repository root and
-   edit the folders and targets. Copy [examples/publish-skills.yml](examples/publish-skills.yml)
-   to `.github/workflows/publish-skills.yml`. Replace the action owner and pin a
-   reviewed release commit SHA.
-4. Run the workflow manually, or merge a change on `main`. Check the per-skill
-   summary and downloadable JSON report.
+   for the service principal, repository, and GitHub environment `production`.
+   Match GitHub's exact OIDC subject, which can include immutable numeric IDs.
+3. In the repository's **Settings > Environments > production**, add environment
+   **variables** `DATABRICKS_HOST` (workspace URL) and `DATABRICKS_CLIENT_ID`
+   (publishing principal's application ID). Neither value is a secret. The SDK
+   automatically exchanges GitHub's short-lived OIDC token with Databricks.
+
+An organization can centralize the administrator setup and reusable workflows
+so each skill repository only chooses its folder and destination schema.
 
 ## Folder mappings
 
@@ -69,7 +101,9 @@ read credential.
 
 | Input | Default | Purpose |
 |---|---|---|
-| `mapping-file` | `skills.yaml` | Mapping relative to the source checkout |
+| `skills-directory` | unset | Publish all immediate skill folders without a mapping file |
+| `target-schema` | unset | Destination catalog.schema for skills-directory |
+| `mapping-file` | unset | Custom mappings; falls back to skills.yaml if directory inputs are absent |
 | `source-directory` | `.` | Source checkout root |
 | `dry-run` | `false` | Validate all bundles without authentication or API calls |
 | `prune-files` | `false` | Remove stale files inside mapped skills for exact mirroring |
@@ -129,7 +163,7 @@ authentication; local publishing success does not validate GitHub federation.
 ## Release for customer distribution
 
 The repository root contains `action.yml`, so customers can consume it directly
-with `uses: OWNER/uc-skills-action@<commit>`. There is no GitHub App installation.
+with `uses: sunishsheth2009/uc-skills-action@<commit>`. There is no GitHub App installation.
 Publishing to GitHub Marketplace is optional and requires repository-owner review
 of the release and listing. For official distribution, transfer the reviewed
 action into an approved Databricks-owned public repository, confirm licensing and

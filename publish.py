@@ -94,8 +94,25 @@ def read_bundle(root: Path, path: str, target: str) -> Bundle:
     return Bundle(path, target, files, digest.hexdigest())
 
 
-def load_bundles(root: Path, mapping_file: str) -> list[Bundle]:
-    config = yaml.safe_load(confined(root, mapping_file).read_text())
+def load_bundles(
+    root: Path,
+    mapping_file: str | None = None,
+    skills_directory: str | None = None,
+    target_schema: str | None = None,
+) -> list[Bundle]:
+    if skills_directory or target_schema:
+        if mapping_file or not (skills_directory and target_schema):
+            raise ValueError(
+                "Use skills-directory and target-schema together, or a mapping-file"
+            )
+        config = {
+            "version": 1,
+            "directories": [{"path": skills_directory, "schema": target_schema}],
+        }
+    else:
+        config = yaml.safe_load(
+            confined(root, mapping_file or "skills.yaml").read_text()
+        )
     if (
         not isinstance(config, dict)
         or set(config) - {"version", "skills", "directories"}
@@ -231,7 +248,9 @@ def source_commit(root: Path) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-directory", default=".")
-    parser.add_argument("--mapping-file", default="skills.yaml")
+    parser.add_argument("--mapping-file")
+    parser.add_argument("--skills-directory")
+    parser.add_argument("--target-schema")
     parser.add_argument("--profile", help="Databricks CLI/SDK profile for local use")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--prune-files", action="store_true")
@@ -245,7 +264,9 @@ def main() -> int:
         "results": [],
     }
     try:
-        bundles = load_bundles(root, args.mapping_file)
+        bundles = load_bundles(
+            root, args.mapping_file, args.skills_directory, args.target_schema
+        )
         if args.dry_run:
             report["results"] = [
                 {

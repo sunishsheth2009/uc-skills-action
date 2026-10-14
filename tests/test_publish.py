@@ -99,6 +99,33 @@ def test_discovery_and_custom_uc_name(tmp_path):
     assert load_bundles(tmp_path, "skills.yaml")[0].target == "acme.skills.custom_name"
 
 
+def test_directory_inputs_need_no_mapping_file(tmp_path):
+    bundle(tmp_path)
+    (tmp_path / "skills.yaml").unlink()
+    bundles = load_bundles(
+        tmp_path, skills_directory="skills", target_schema="acme.skills"
+    )
+    assert bundles[0].target == "acme.skills.guide"
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"skills_directory": "skills"},
+        {"target_schema": "acme.skills"},
+        {
+            "mapping_file": "skills.yaml",
+            "skills_directory": "skills",
+            "target_schema": "acme.skills",
+        },
+    ],
+)
+def test_directory_inputs_reject_ambiguous_configuration(tmp_path, kwargs):
+    bundle(tmp_path)
+    with pytest.raises(ValueError, match="together"):
+        load_bundles(tmp_path, **kwargs)
+
+
 def test_duplicate_target_fails_before_publish(tmp_path):
     bundle(tmp_path)
     mapping = (

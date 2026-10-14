@@ -6,8 +6,14 @@ branding:
   color: red
 inputs:
   mapping-file:
-    description: YAML mapping file, relative to source-directory.
-    default: skills.yaml
+    description: Optional YAML mappings; defaults to skills.yaml when directory inputs are absent.
+    default: ''
+  skills-directory:
+    description: Publish every immediate skill folder under this directory, without a mapping file.
+    default: ''
+  target-schema:
+    description: Target catalog.schema for skills-directory.
+    default: ''
   source-directory:
     description: Root of the checked-out source repository.
     default: '.'
@@ -44,11 +50,16 @@ runs:
         ACTION_DIR: ${{ github.action_path }}
         SOURCE_DIR: ${{ inputs.source-directory }}
         MAPPING_FILE: ${{ inputs.mapping-file }}
+        SKILLS_DIRECTORY: ${{ inputs.skills-directory }}
+        TARGET_SCHEMA: ${{ inputs.target-schema }}
         DRY_RUN: ${{ inputs.dry-run }}
         PRUNE_FILES: ${{ inputs.prune-files }}
         WORKERS: ${{ inputs.workers }}
       run: |
-        args=(--source-directory "$SOURCE_DIR" --mapping-file "$MAPPING_FILE" --workers "$WORKERS" --report "$RUNNER_TEMP/uc-skills-report.json")
+        args=(--source-directory "$SOURCE_DIR" --workers "$WORKERS" --report "$RUNNER_TEMP/uc-skills-report.json")
+        if [[ -n "$MAPPING_FILE" ]]; then args+=(--mapping-file "$MAPPING_FILE"); fi
+        if [[ -n "$SKILLS_DIRECTORY" ]]; then args+=(--skills-directory "$SKILLS_DIRECTORY"); fi
+        if [[ -n "$TARGET_SCHEMA" ]]; then args+=(--target-schema "$TARGET_SCHEMA"); fi
         case "$DRY_RUN" in true) args+=(--dry-run);; false) ;; *) echo 'dry-run must be true or false'; exit 1;; esac
         case "$PRUNE_FILES" in true) args+=(--prune-files);; false) ;; *) echo 'prune-files must be true or false'; exit 1;; esac
         echo "report-file=$RUNNER_TEMP/uc-skills-report.json" >> "$GITHUB_OUTPUT"

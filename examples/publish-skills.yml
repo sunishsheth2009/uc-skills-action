@@ -22,8 +22,8 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
-      # Replace OWNER/uc-skills-action and pin a reviewed release commit SHA.
-      - uses: OWNER/uc-skills-action@v0.1.0
+      # Pin a reviewed release commit SHA for production.
+      - uses: sunishsheth2009/uc-skills-action@v0.1.0
         id: skills
         with:
           mapping-file: skills.yaml
