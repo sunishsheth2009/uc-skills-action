@@ -30,15 +30,20 @@ profile. No Databricks compute was started.
 | Change SKILL.md, add a reference and remove an obsolete reference | Passed: 2 uploads, 1 removal |
 | Preserve effective owner and grants during update | Passed |
 | Rerun after the update | Unchanged |
-| Behavioral unit tests | 13 passed |
+| Behavioral unit tests | 17 passed |
 | Ruff lint and format | Passed |
 | YAML parsing and composite Bash syntax | Passed |
-| GitHub runner composite execution | Pending repository publication |
-| GitHub OIDC against staging | Pending federation setup and GitHub runner test |
+| GitHub runner composite execution | Passed, including mapping and simple directory inputs |
+| Fork GitHub dry run on all 34 source skills | Passed |
+| GitHub live OAuth M2M publishing | Passed: 34 created, 354 uploads |
+| GitHub live simple-directory rerun | Passed: 34 unchanged, 0 uploads, 0 removals |
+| GitHub OIDC against staging | Not tested: account profile needs reauthentication |
 
 JSON evidence is stored locally in `reports/staging-create.json`,
 `reports/staging-rerun.json`, and `reports/staging-roundtrip.json`. Reports are
-ignored by Git and contain no tokens. The retained custom skill has only test
+ignored by Git and contain no tokens. GitHub run artifacts are also saved under
+`reports/github-create/` and `reports/github-rerun/`; all 34 GitHub bundle hashes
+match the original local source snapshots. The retained custom skill has only test
 instructions, a small binary asset, and a reference file.
 
 ## Reproduce locally
@@ -68,34 +73,46 @@ The roundtrip check creates or updates only its named POC skill. It asserts
 byte-for-byte convergence and ownership/grant preservation. It never deletes a
 whole skill.
 
-## GitHub POC handoff
+## Published GitHub POC
 
-A local clone is prepared at `../uc-skills-poc-source` with the additional workflow
-`.github/workflows/publish-uc-skills-poc.yml`. The managed GitHub account could
-read the public source but GitHub rejected its fork request with HTTP 403 because
-Enterprise Managed Users cannot fork this content. Personal-account approval is
-pending; no fallback identity was used and neither POC repository was published.
+- Action: https://github.com/sunishsheth2009/uc-skills-action
+- Release: https://github.com/sunishsheth2009/uc-skills-action/releases/tag/v0.1.0
+- Source fork: https://github.com/sunishsheth2009/databricks-agent-skills
+- Action CI (including both quickstart modes):
+  https://github.com/sunishsheth2009/uc-skills-action/actions/runs/38638946151
+- Live directory-input rerun:
+  https://github.com/sunishsheth2009/databricks-agent-skills/actions/runs/38639239894
+- Live staging publish:
+  https://github.com/sunishsheth2009/databricks-agent-skills/actions/runs/38639123780
+- Fork dry run, all 34 real source folders:
+  https://github.com/sunishsheth2009/databricks-agent-skills/actions/runs/38638250459
 
-After the GitHub identity is selected:
+The fork contains the additional manually dispatched workflow
+`.github/workflows/publish-uc-skills-poc.yml`. Inherited release and maintenance
+workflows are disabled in the fork. Source skill contents and licensing remain
+unchanged. The POC workflow pins the v0.1.0 action commit.
 
-1. Fork `databricks/databricks-agent-skills` and publish the separate action repo.
-2. Replace `OWNER/uc-skills-action@v0.1.0` in the fork's new POC workflow with the
-   reviewed action commit SHA. Push only the added POC workflow to the fork.
-3. Run the action repository CI and the fork POC workflow with `dry_run: true`.
-4. Provision a dedicated staging service principal and federation policy scoped
-   to this fork's `staging` GitHub environment. Give it workspace access and the
-   required catalog/schema and skill grants. If testing updates to the user-owned
-   POC skills, explicitly grant read/write privileges to that principal, or use a
-   separate service-principal-owned POC schema.
-5. Set the `staging` environment variables `DATABRICKS_HOST`,
-   `DATABRICKS_CLIENT_ID`, and `UC_SKILLS_SCHEMA` and verify the exact GitHub OIDC
-   subject/audience for the new fork. The publisher uses SDK unified authentication;
-   validate the staging discovery/token endpoint rather than assuming production
-   defaults. Run the POC workflow with `dry_run: false`, then rerun unchanged.
-6. Keep source skill licensing intact in the fork. The separate action contains
-   newly authored publisher code and fixture content under its MIT license.
+A dedicated workspace service principal named `uc-skills-github-poc` has access
+only to skill publishing in `e2e_testing.sunish_uc_skills_github_poc` (plus catalog
+usage and workspace access). The GitHub `staging` environment has the workspace
+URL, client ID, destination schema, and an OAuth secret that expires after one day.
+The secret was sent directly to GitHub's secret store and was never committed.
+The principal creates and owns the GitHub-published skills. The original local
+integration schema and its ownership remain unchanged.
 
-This is ready for review as a reusable-action POC. Official Databricks distribution
+ml-inference staging rejects traffic from public GitHub runners. Live staging
+runs therefore use temporary repository-specific self-hosted runners on the
+connected development machine. Each runner accepted one trusted manual POC job and
+unregistered afterwards. No runner service remains installed. Repeating a live
+fork run requires another connected runner and a valid publishing credential. The runner uses the machine's installed corporate CA
+bundle and configured Python package mirror. These settings belong to the POC
+infrastructure and do not appear in the public customer quickstart.
+
+The staging account profile has an expired refresh token, so this POC validates
+OAuth M2M rather than GitHub OIDC. OIDC support comes from SDK unified authentication
+and needs its own account-level federation setup and integration validation.
+
+This is a personal-account reusable-action POC. Official Databricks distribution
 and Marketplace publication have not been performed. In-place bundle updates are
 not atomic. The 34-skill run demonstrates the API path and bounded concurrency;
 it is not a benchmark for repositories with thousands of large skill bundles.

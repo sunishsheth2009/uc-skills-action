@@ -5,6 +5,9 @@ Unity Catalog skills whenever you merge changes. Publishing runs on the GitHub
 runner using the Skills and Files APIs. No Databricks notebook, job, or compute is
 required. This repository is a POC, not an official Databricks supported action.
 
+[Tested from GitHub against staging](POC.md): 34 skills, 354 files; the second run
+made zero writes. [Suggested customer docs section](docs/customer-docs-section.md).
+
 ## Get started: one workflow file
 
 Once your Databricks administrator has connected GitHub to a publishing service
@@ -192,4 +195,4 @@ not imply official support.
 ```
 
 CI runs behavioral unit tests and invokes the composite action in local-only
-validation mode. Live integration results are documented in `POC.md` after testing.
+validation mode. Live integration results are documented in `POC.md`.
