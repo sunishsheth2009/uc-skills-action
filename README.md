@@ -98,6 +98,11 @@ the action to the reviewed v0.1.0 commit
 
 ### 4. Publish and verify
 
+The examples publish on matching pushes, including the commit that adds the
+workflow. If you want to validate before any automatic publish, initially remove
+the `push` trigger and keep `workflow_dispatch`; restore `push` after verification.
+The validation checkbox applies only to manual runs.
+
 1. Commit the workflow to your default branch. GitHub only offers manual dispatch
    after the workflow exists on that branch.
 2. Open **Actions > Publish skills to Databricks > Run workflow**. Leave
