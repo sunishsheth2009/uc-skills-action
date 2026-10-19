@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths: ['skills/**', '.github/workflows/publish-skills.yml']
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate folders only (does not test Databricks authentication)
+        type: boolean
+        default: true
 permissions:
   contents: read
 concurrency:
@@ -12,6 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
+    # For private workspaces, use a Linux runner with workspace network access.
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -24,7 +30,15 @@ jobs:
         with:
           persist-credentials: false
       - uses: sunishsheth2009/uc-skills-action@v0.1.0
+        id: skills
         with:
           skills-directory: skills
           target-schema: acme.team_skills
           prune-files: 'true'
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+      - name: Upload publishing report
+        if: always() && steps.skills.outputs.report-file != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: uc-skills-report
+          path: ${{ steps.skills.outputs.report-file }}

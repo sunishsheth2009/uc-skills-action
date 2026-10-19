@@ -1,31 +1,82 @@
 # Publish Git skill folders to Unity Catalog
 
-Add this GitHub Action to a repository to publish `SKILL.md` folders as Databricks
-Unity Catalog skills whenever you merge changes. Publishing runs on the GitHub
-runner using the Skills and Files APIs. No Databricks notebook, job, or compute is
-required. This repository is a POC, not an official Databricks supported action.
+Publish skills from your GitHub repository to Databricks Unity Catalog when you
+merge changes. The action runs on a GitHub runner and calls the Skills and Files
+APIs directly. No Databricks notebook, job, or compute is required.
 
-[Tested from GitHub against staging](POC.md): 34 skills, 354 files; the second run
-made zero writes. [Suggested customer docs section](docs/customer-docs-section.md).
+This is a community POC in a personal repository, not an officially supported
+Databricks action. [Live test results](POC.md): 34 skills and 354 files published
+from GitHub to staging; a second run made zero writes. OAuth M2M was tested live;
+GitHub OIDC uses SDK support but has not been integration-tested in this POC.
 
-## Get started: one workflow file
+## Set up in four steps
 
-Once your Databricks administrator has connected GitHub to a publishing service
-principal, you only need one workflow file. No mapping file is needed when the
-skill folders all go to the same schema.
+### 1. Prepare your skill folder and destination
 
-1. Copy [examples/quickstart.yml](examples/quickstart.yml)
-   ([download](https://raw.githubusercontent.com/sunishsheth2009/uc-skills-action/v0.1.0/examples/quickstart.yml)) into your repository as
-   `.github/workflows/publish-skills.yml`.
-2. Change `skills-directory: skills` to your skills folder and
-   `target-schema: acme.team_skills` to your UC schema. If you change the folder,
-   update the workflow's `paths` filter too.
-3. In GitHub, open **Actions > Publish skills to Databricks > Run workflow**, or
-   merge a skill change to `main`.
+Your repository needs one folder per skill, each containing `SKILL.md`:
 
-The action maps `skills/<folder>/SKILL.md` to `acme.team_skills.<folder>` and
-publishes supporting files too. No fork, GitHub App installation, notebook, or
-Databricks job is needed. Customers reference the hosted action:
+```text
+skills/
+  sql-guide/
+    SKILL.md
+    references/             # optional supporting files
+  code-review/
+    SKILL.md
+```
+
+For example, `skills/sql-guide/SKILL.md`:
+
+```markdown
+---
+name: sql-guide
+description: Team SQL conventions; use when authoring or reviewing SQL.
+---
+
+Use snake_case names and list columns explicitly instead of SELECT *.
+```
+
+Choose an existing UC schema, for example `acme.team_skills`. The action maps
+`skills/sql-guide` to `acme.team_skills.sql-guide` and includes supporting files.
+Discovery checks immediate child folders, not arbitrary nested skill locations.
+
+Ask your Databricks administrator to enable UC skills, prepare managed storage for
+the destination schema, and give a publishing service principal workspace access
+and the required UC privileges. The action does not create catalogs or schemas.
+See [administrator setup](docs/authentication.md#1-prepare-databricks-access).
+
+### 2. Connect GitHub to Databricks once
+
+Choose one authentication method:
+
+| Method | Use it when | Complete instructions |
+|---|---|---|
+| GitHub OIDC (recommended) | Your administrator can configure workload identity federation; no Databricks secret is stored in GitHub | [Set up OIDC](docs/authentication.md#2a-github-oidc-recommended) |
+| Databricks OAuth M2M | You already use a Databricks service principal with an OAuth secret in CI, or want to start with that setup | [Set up OAuth M2M](docs/authentication.md#2b-databricks-oauth-m2m) |
+
+Both methods publish as the service principal, with its UC permissions. Neither
+uses your personal Databricks login or GitHub account as the Databricks identity.
+
+In GitHub **Settings > Environments**, create an environment named `production`.
+The auth guide explains the exact variables, optional secret, and federation
+policy to configure there. The workflow's environment name must match.
+
+For private workspaces or IP restrictions, use a Linux self-hosted runner that can
+reach the workspace. Otherwise the examples use GitHub-hosted `ubuntu-latest`.
+Your runner also needs access to GitHub and a Python package index. The action
+installs Python 3.12 and its dependencies; you do not install the Databricks CLI
+on the runner. Check your organization's policy permits this third-party action.
+
+### 3. Copy one workflow and choose two settings
+
+Copy the complete workflow for your authentication method into your repository as
+`.github/workflows/publish-skills.yml`:
+
+- **OIDC:** [quickstart.yml](examples/quickstart.yml)
+  ([raw file](https://raw.githubusercontent.com/sunishsheth2009/uc-skills-action/main/examples/quickstart.yml)).
+- **OAuth M2M:** [quickstart-oauth.yml](examples/quickstart-oauth.yml)
+  ([raw file](https://raw.githubusercontent.com/sunishsheth2009/uc-skills-action/main/examples/quickstart-oauth.yml)).
+
+Edit these two settings in the action step:
 
 ```yaml
 - uses: sunishsheth2009/uc-skills-action@v0.1.0
@@ -35,43 +86,40 @@ Databricks job is needed. Customers reference the hosted action:
     prune-files: 'true'
 ```
 
-For custom names or several destination schemas, use the mapping example below.
-Pin a reviewed release commit SHA for production. The current personal-account
-release is a POC; official Databricks docs should reference an approved
-Databricks-owned action once it has been reviewed and transferred.
+This snippet is a **step**, not a complete workflow. Copy the linked full file so
+checkout, authentication, triggers, serialization, and result reporting are included.
+No fork or GitHub App installation is needed.
 
-### One-time administrator setup
+If you change the source folder, also update the workflow's `paths` filter. If your
+default branch is not `main`, update `branches`. For a private workspace, replace
+`runs-on: ubuntu-latest` with your connected runner's labels. For production, pin
+the action to the reviewed v0.1.0 commit
+`97129de1ab3f0cf7df01f7b51efa0427b4c36d8f` instead of a tag.
 
-This setup is required for any automated publisher, including the notebook.
-Skill authors should not have to repeat it.
+### 4. Publish and verify
 
-1. Enable UC skills in the workspace and create the destination catalog/schema.
-   Give the publishing service principal workspace access, `USE CATALOG`,
-   `USE SCHEMA`, and `CREATE VOLUME`. Existing skills also need `READ VOLUME`
-   and `WRITE VOLUME` for that publisher. New skills are owned by the publisher;
-   share them separately with `READ VOLUME` grants.
-2. Configure [GitHub workload identity federation](https://docs.databricks.com/aws/en/dev-tools/auth/provider-github)
-   for the service principal, repository, and GitHub environment `production`.
-   Match GitHub's exact OIDC subject, which can include immutable numeric IDs.
-3. In the repository's **Settings > Environments > production**, add environment
-   **variables** `DATABRICKS_HOST` (workspace URL) and `DATABRICKS_CLIENT_ID`
-   (publishing principal's application ID). Neither value is a secret. The SDK
-   automatically exchanges GitHub's short-lived OIDC token with Databricks.
+1. Commit the workflow to your default branch. GitHub only offers manual dispatch
+   after the workflow exists on that branch.
+2. Open **Actions > Publish skills to Databricks > Run workflow**. Leave
+   **Validate folders only** checked for the first run. This checks local content
+   without calling Databricks; it does not test authentication or UC permissions.
+3. Run it again with that checkbox unchecked. Confirm the job succeeds and the
+   summary shows `created`, `updated`, or `unchanged` for every mapped skill.
+4. In Databricks **Catalog Explorer**, open the target schema and inspect the skills.
+   New skills belong to the publishing service principal. Sharing with teammates
+   is a separate UC grant; see [share published skills](docs/authentication.md#3-share-published-skills).
+5. Run publishing again without changing the skills. Expect `unchanged` and zero
+   uploads/removals. Download `uc-skills-report` from the run's **Artifacts** for
+   per-skill details and the checked-out commit SHA.
 
-If your organization already has a service principal for OAuth CI, reuse that
-setup with [examples/quickstart-oauth.yml](examples/quickstart-oauth.yml). Store
-`DATABRICKS_CLIENT_SECRET` as a GitHub environment **secret** and the workspace URL
-and client ID as environment variables. This avoids needing a new federation
-policy, while requiring secret rotation. The publishing permissions are the same.
+After setup, pushes to `main` that match the workflow's path filters publish
+automatically. These push runs always publish, rather than using the manual
+validation checkbox. Tags and releases need their own workflow triggers.
 
-For a workspace with private networking or IP restrictions, use a self-hosted
-GitHub runner with access to the workspace. GitHub-hosted `ubuntu-latest` runners
-can be used when the workspace is publicly reachable and permits those requests.
+## Map specific folders to specific UC skills
 
-An organization can centralize the administrator setup and reusable workflows
-so each skill repository only chooses its folder and destination schema.
-
-## Folder mappings
+Use this when folders need custom UC names or different destination schemas.
+Create `skills.yaml` at the repository root:
 
 ```yaml
 version: 1
@@ -82,117 +130,76 @@ skills:
     target: acme.team_skills.code-review
 ```
 
-Any folder in the checkout is supported; no marketplace manifest or agent-specific
-repository structure is required. UC securable names and frontmatter bundle names
-are independent. The original frontmatter is retained. Each folder must contain
-valid `SKILL.md` frontmatter with a skill name and a description of at most 1024 UTF-8
-bytes. Supporting files, including binary assets and nested directories, are
-included. Paths must stay in the checkout, and symlinks are rejected. This POC
-accepts lowercase UC identifiers containing letters, numbers, underscores, and
-hyphens. Multiple folders cannot target the same skill.
-
-To publish all immediate skill folders under one directory:
+In your chosen authentication workflow, replace `skills-directory` and
+`target-schema` with `mapping-file`:
 
 ```yaml
-version: 1
-directories:
-  - path: skills
-    schema: acme.team_skills
+- uses: sunishsheth2009/uc-skills-action@v0.1.0
+  with:
+    mapping-file: skills.yaml
+    prune-files: 'true'
 ```
 
-This maps `skills/<folder>/SKILL.md` to `acme.team_skills.<folder>`. Non-skill child
-directories are ignored. Use explicit entries for exceptions, and avoid overlapping
-targets between explicit mappings and directory discovery. Zero-skill mappings fail.
+Do not combine those two input modes. There is no inline `skills:` action input.
+Include `skills.yaml` and **every mapped source folder** in the workflow's push
+`paths`. A complete OIDC mapping workflow is in
+[examples/publish-skills.yml](examples/publish-skills.yml); for OAuth M2M, keep the
+OAuth environment configuration from your quickstart.
 
-To source skills from another repository, use `actions/checkout` with `repository`,
-`ref`, and `path`, and pass that path as `source-directory`. Put the mapping file
-inside that checkout, or copy a centrally managed mapping into it. GitHub checks
-out private source repos with its own credentials; Databricks needs no Git
-credential. A separate private source repo needs a scoped GitHub App token or other
-read credential.
+For directory discovery in a mapping file, or a separate source repository, see
+[customization](docs/customization.md).
 
-## Inputs and outputs
+## Update behavior
+
+- Existing skills are updated in place, retaining ownership and grants. Identical
+  finalized bundles are skipped after comparing remote file contents.
+- `prune-files: 'true'` removes remote files absent from each mapped local folder.
+  Use it only for skill bundles this repository should fully manage. When false,
+  stale remote files cause that skill to fail before writes.
+- Removing a folder or mapping does **not** delete its UC skill. Renaming a target
+  creates a new skill and retains the old one. Delete obsolete skills explicitly.
+- Updates are **not atomic**. A failure can leave partially updated files; retrying
+  converges to the source contents. Other skills can succeed when one fails, but
+  the job still fails. Use one publishing repository per target and keep the
+  example's concurrency setting.
+
+## Reference
 
 | Input | Default | Purpose |
 |---|---|---|
-| `skills-directory` | unset | Publish all immediate skill folders without a mapping file |
-| `target-schema` | unset | Destination catalog.schema for skills-directory |
-| `mapping-file` | unset | Custom mappings; falls back to skills.yaml if directory inputs are absent |
-| `source-directory` | `.` | Source checkout root |
-| `dry-run` | `false` | Validate all bundles without authentication or API calls |
-| `prune-files` | `false` | Remove stale files inside mapped skills for exact mirroring |
+| `skills-directory` | unset | Discover immediate skill folders |
+| `target-schema` | unset | Destination `catalog.schema`; required with `skills-directory` |
+| `mapping-file` | unset | Custom YAML mappings; defaults to `skills.yaml` if directory inputs are absent |
+| `source-directory` | `.` | Source checkout root; source and mapping paths are relative to this root |
+| `dry-run` | `false` | Validate content locally without Databricks calls |
+| `prune-files` | `false` | Remove stale files inside mapped skills; never deletes a skill |
 | `workers` | `4` | Concurrent skill publishers, from 1 to 8 |
 
-The `report-file` output is an absolute path to a JSON report with the checked-out
-source commit, bundle SHA-256s, per-skill status, and uploaded/removed file counts.
-Failures set a nonzero exit code after other skills finish. Local validation errors
-fail before remote writes. Reports omit API exception bodies and include error
-types to avoid dumping credentials or upstream request details.
+`report-file` is an absolute path to JSON results containing source commit,
+bundle SHA-256s, statuses, and uploaded/removed counts. The action also writes a
+GitHub job summary. Failure reports omit API response bodies; use the exception
+type and [troubleshooting guide](docs/troubleshooting.md) to narrow down the cause.
 
-## Update behavior and limits
+Skill frontmatter needs a valid name and a nonempty description of at most 1024
+UTF-8 bytes. UC target names may differ from the frontmatter name. This POC accepts
+lowercase UC identifiers starting with a letter or number and containing letters,
+numbers, underscores, or hyphens. Paths must stay in the source checkout; symlinks
+and nested `.git` content are rejected. Duplicate targets and zero discovered
+skills fail validation. All local bundles are held in memory and validated before
+writes. Remote comparisons read bundle contents, so large repositories incur
+proportional API traffic; 34 skills is the tested POC, not a large-scale benchmark.
 
-- Local folders are validated and snapshotted before publishing.
-- Remote bytes are compared to the snapshot; unchanged files aren't uploaded and
-  identical finalized bundles are skipped. This requires remote reads proportional
-  to bundle size, avoids an external hash database, and detects out-of-band edits.
-  Start with four workers and lower the value for large bundles or rate limits.
-  The SDK handles eligible transient API retries. This POC holds all local bundles
-  in memory; it has no repository-size benchmark or incremental hash index yet.
-- Existing skills are updated in place, preserving ownership and grants.
-- With `prune-files: false`, stale remote files cause that skill to fail before
-  writes. With `true`, stale files are removed after uploads succeed. Empty remote
-  directories can remain; they contain no bundle files.
-- Removing a folder or mapping never deletes its UC skill. Whole-skill deletion is
-  an explicit administrative operation. Renaming a target creates a new skill and
-  leaves the old one in place.
-- File uploads and finalization are separate operations. Updates are **not atomic**;
-  consumers can observe mixed contents, and failed updates can leave partial
-  changes. Retrying converges to the source bundle. `SKILL.md` is uploaded last.
-  Finalization refreshes metadata and validates; it is not a transaction boundary.
-- Use one writer per target and a GitHub `concurrency` group with
-  `cancel-in-progress: false`. Groups do not coordinate different repositories;
-  give each target one publishing repository.
-- For PRs, run only `dry-run: true` without Databricks authentication. Publish from
-  the trusted branch or a protected deployment environment.
+- [Authentication and administrator setup](docs/authentication.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Customization, other repositories, and local runs](docs/customization.md)
+- [Integration evidence and POC limitations](POC.md)
+- [Proposed section for official documentation](docs/customer-docs-section.md)
 
-## Customize or run locally
+To change the implementation, fork this repo or copy `action.yml`, `publish.py`,
+and `requirements.txt` into `.github/actions/uc-skills`. Use
+`uses: ./.github/actions/uc-skills` after checkout. Marketplace listing is optional.
+Official distribution should use a reviewed Databricks-owned repository and release.
 
-Fork this repository, or copy `action.yml`, `publish.py`, and `requirements.txt`
-into `.github/actions/uc-skills` and use `uses: ./.github/actions/uc-skills` after
-checkout. The Python publisher is shared by the action and local runs.
-
-```bash
-python3.12 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python publish.py --source-directory /path/to/repo --dry-run
-.venv/bin/python publish.py --source-directory /path/to/repo \
-  --profile your-workspace-profile --prune-files --report reports/publish.json
-```
-
-Customer workflows use SDK environment configuration, including GitHub OIDC and
-OAuth M2M. Local runs can select a CLI profile with `--profile`. Don't commit tokens
-or credentials. Staging OIDC setup is tested separately from local profile
-authentication; local publishing success does not validate GitHub federation.
-
-## Release for customer distribution
-
-The repository root contains `action.yml`, so customers can consume it directly
-with `uses: sunishsheth2009/uc-skills-action@<commit>`. There is no GitHub App installation.
-Publishing to GitHub Marketplace is optional and requires repository-owner review
-of the release and listing. For official distribution, transfer the reviewed
-action into an approved Databricks-owned public repository, confirm licensing and
-ownership, run staging integration tests, tag a release, and publish release notes
-covering API compatibility. Keep customers on reviewed release SHAs. This POC does
-not imply official support.
-
-## Development
-
-```bash
-.venv/bin/pip install pytest ruff
-.venv/bin/python -m pytest -q
-.venv/bin/ruff check .
-.venv/bin/ruff format --check .
-```
-
-CI runs behavioral unit tests and invokes the composite action in local-only
-validation mode. Live integration results are documented in `POC.md`.
+For development, install `requirements.txt`, `pytest`, and `ruff` in a Python 3.12
+virtual environment, then run `python -m pytest -q`, `ruff check .`, and
+`ruff format --check .` from the repository root.

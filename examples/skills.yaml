@@ -2,7 +2,7 @@ version: 1
 skills:
   - path: skills/sql-guide
     target: acme.team_skills.sql-guide
-  - path: .claude/skills/code-review
+  - path: .claude/skills/review
     target: acme.team_skills.code-review
 # Or discover every immediate child folder containing SKILL.md:
 # directories:
